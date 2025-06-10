@@ -232,14 +232,14 @@ def setup():
 
 def run_bot():
     app.run_polling()
+    
+    def run_bot():
+    print("🔁 BOT EN TRAIN DE SE CONNECTER À TELEGRAM...")
+    app.run_polling()
 
 @flask_app.route('/')
 def index():
     return "✅ Bot en ligne."
-    
-def run_bot():
-    print("🔁 BOT EN TRAIN DE SE CONNECTER À TELEGRAM...")
-    app.run_polling()
     
 def run_flask():
     flask_app.run(host='0.0.0.0', port=10000)
