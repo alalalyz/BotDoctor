@@ -103,7 +103,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         button = KeyboardButton('📱 Envoyer mon numéro', request_contact=True)
         reply_markup = ReplyKeyboardMarkup([[button]], one_time_keyboard=True, resize_keyboard=True)
         await query.message.reply_text(
-            "🔒 *Ton anonymat est respecté.*
+            "🔒 *Ton anonymat est respecté."*
 
 "
             "Si tu veux être contacté plus rapidement pour la livraison, tu peux partager ton numéro (facultatif).
