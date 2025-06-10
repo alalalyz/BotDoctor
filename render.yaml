@@ -1,14 +1,15 @@
 services:
   - type: web
-    name: doctorbot
+    name: botdoctor
     env: python
+    region: frankfurt
     plan: free
     buildCommand: ""
-    startCommand: bash start.sh
+    startCommand: python main.py
     envVars:
       - key: TOKEN
         value: 7644782997:AAGRD4wXYs6_YHKlvUlne14ow37byBaqb5s
       - key: ADMIN_IDS
         value: 542839510,5960037916
-    autoDeploy: true
-    region: frankfurt
+    autoDeploy: false
+    branch: main
