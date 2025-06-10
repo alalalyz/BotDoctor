@@ -162,7 +162,10 @@ async def validate_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id in user_data:
         del user_data[user_id]
     await query.message.reply_text(f"Commande {status.lower()}.")
-
+    
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("✉️ Message reçu !")
+    
 async def add_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.id not in ADMIN_IDS:
         await update.message.reply_text("🚫 Tu n'es pas admin.")
@@ -228,9 +231,6 @@ def run_bot():
     app.add_handler(CallbackQueryHandler(button))
     app.add_handler(MessageHandler(filters.CONTACT, get_contact))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, get_address))
-    
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✉️ Message reçu !")
 
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 print("✅ Bot en ligne.")
