@@ -105,9 +105,8 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(
             "🔒 *Ton anonymat est respecté."*
 
-"
-            "Si tu veux être contacté plus rapidement pour la livraison, tu peux partager ton numéro (facultatif).
-"
+
+            "Si tu veux être contacté plus rapidement pour la livraison, tu peux partager ton numéro (facultatif)."
             "_Attention :_ tu recevras un appel **en numéro masqué** pour protéger ton anonymat.",
             reply_markup=reply_markup,
             parse_mode='Markdown'
