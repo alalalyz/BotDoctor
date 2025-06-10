@@ -109,11 +109,6 @@ async def get_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
     address = update.message.text.strip()
     if user_id not in user_data:
         return
-        
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print(f"📩 /start reçu de {update.effective_user.id}")
-    await update.message.reply_text("👋 Hello, ton bot est bien en ligne !")
-    
     
     produit = user_data[user_id]["produit"]
     phone = user_data[user_id].get("phone", "Non fourni")
