@@ -233,8 +233,8 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✉️ Message reçu !")
 
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
-    print("✅ Bot en ligne.")
-    app.run_polling()
+print("✅ Bot en ligne.")
+app.run_polling()
 
 # Serveur Flask pour Render
 app_flask = Flask(__name__)
