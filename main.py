@@ -2,7 +2,6 @@ import os
 import json
 import csv
 import time
-from flask import Flask
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
     KeyboardButton, ReplyKeyboardMarkup
@@ -12,6 +11,7 @@ from telegram.ext import (
     filters, ContextTypes, ConversationHandler
 )
 
+# 🔥 Variables d'environnement
 TOKEN = os.getenv('TOKEN')
 ADMIN_IDS = list(map(int, os.getenv('ADMIN_IDS', '').split(',')))
 
@@ -19,9 +19,12 @@ user_data = {}
 adding_product = {}
 maintenance_mode = False
 
+# Sauvegarde produits
 PRODUCTS_FILE = 'products.json'
+# Sauvegarde commandes
 ORDERS_FILE = 'orders.csv'
 
+# Charger les produits
 def load_products():
     if os.path.exists(PRODUCTS_FILE):
         with open(PRODUCTS_FILE, 'r') as file:
@@ -32,10 +35,12 @@ def load_products():
             "Weed": ["50€", "100€"]
         }
 
+# Sauvegarder les produits
 def save_products():
     with open(PRODUCTS_FILE, 'w') as file:
         json.dump(PRODUCTS, file)
 
+# Sauvegarder les commandes
 def save_order(user_id, produit, address, phone, status):
     with open(ORDERS_FILE, 'a', newline='') as file:
         writer = csv.writer(file)
@@ -43,7 +48,9 @@ def save_order(user_id, produit, address, phone, status):
 
 PRODUCTS = load_products()
 
-NOTICE = """🚚 *INFORMATION LIVRAISON :*
+# Notice Livraison
+NOTICE = """
+🚚 *INFORMATION LIVRAISON :*
 
 - Livraison possible dans tous les arrondissements.
 - *ATTENTION* : En dehors du 1er au 16ème arrondissement, un minimum de commande de *150€* est requis.
@@ -52,7 +59,8 @@ Pour discuter du minimum ou plus d'informations :
 👉 Contactez : [@DocteurSto](https://t.me/DocteurSto) ou [@S_Ottoo](https://t.me/S_Ottoo)
 """
 
-NAME, PRICES, REMOVE_CONFIRM = range(3)
+# States
+NAME, PRICES = range(2)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if maintenance_mode:
@@ -73,7 +81,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Bienvenue ! Que veux-tu commander :",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
-    async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -112,7 +121,8 @@ async def get_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data[user_id]["phone"] = phone_number
 
     await update.message.reply_text("Merci pour ton numéro ! Maintenant, envoie ton adresse de livraison.")
-    async def get_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def get_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     address = update.message.text.strip()
 
@@ -123,11 +133,10 @@ async def get_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data[user_id]["address"] = address
     phone = user_data[user_id].get("phone", "Non fourni")
 
-    # Extraire l'arrondissement
     arr = ''.join(filter(str.isdigit, address))
     arr_ok = any(arr.startswith(f"130{i:02}") for i in range(1, 17))
 
-    if not arr_ok and not any("150" in p for p in produit):
+    if not arr_ok and not any("150" in price for price in produit.split()):
         await update.message.reply_text("❌ Minimum de 150€ requis pour les zones hors 13001-13016.")
         save_order(user_id, produit, address, phone, "Refusée")
         return
@@ -137,43 +146,101 @@ async def get_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for admin_id in ADMIN_IDS:
         await context.bot.send_message(
             chat_id=admin_id,
-            text=f"🛒 *Nouvelle commande :*\n"
-                 f"• *Produit :* {produit}\n"
-                 f"• *Adresse :* {address}\n"
-                 f"• *Numéro :* {phone}\n"
-                 f"• *ID Telegram :* `{user_id}`\n"
-                 f"{telegram_link}",
+            text=(
+                f"🛒 **Nouvelle commande :**\n"
+                f"**Produit :** {produit}\n"
+                f"**Adresse :** {address}\n"
+                f"**Numéro :** {phone}\n"
+                f"**ID Telegram :** `{user_id}`\n"
+                f"{telegram_link}"
+            ),
             parse_mode='Markdown',
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("✅ Valider", callback_data=f"valider_{user_id}")],
+                [InlineKeyboardButton("✅ Valider la commande", callback_data=f"valider_{user_id}")],
                 [InlineKeyboardButton("❌ Refuser", callback_data=f"refuser_{user_id}")]
             ])
         )
 
     await update.message.reply_text("Merci ! Votre commande est en attente de validation.")
-    async def validate_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def validate_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
-
     user_id = int(data.split("_")[1])
+
     if "valider_" in data:
         status = "Validée"
-        message = "✅ Ta commande a été validée. Un livreur est en route, prépare le paiement !"
+        message = "✅ Votre commande a été validée. Un livreur est en route, prépare le paiement !"
     else:
         status = "Refusée"
-        message = "❌ Commande refusée. Réessaie plus tard."
+        message = "❌ Désolé, ta commande a été refusée. Réessaie plus tard."
 
     await context.bot.send_message(chat_id=user_id, text=message)
+    save_order(user_id, user_data[user_id]["produit"], user_data[user_id]["address"], user_data[user_id].get("phone", "Non fourni"), status)
 
     if user_id in user_data:
-        save_order(user_id, user_data[user_id]["produit"], user_data[user_id]["address"], user_data[user_id].get("phone", "Non fourni"), status)
         del user_data[user_id]
 
     await query.message.reply_text(f"Commande {status.lower()}.")
+
+async def add_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    if user_id not in ADMIN_IDS:
+        await update.message.reply_text("🚫 Tu n'as pas l'autorisation pour utiliser cette commande.")
+        return ConversationHandler.END
+    await update.message.reply_text("Quel est le *nom* du nouveau produit ?", parse_mode='Markdown')
+    return NAME
+
+async def get_product_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    adding_product[user_id] = {"name": update.message.text}
+    await update.message.reply_text("Indique les *prix* disponibles séparés par une virgule (ex: 20€, 50€, 100€) :", parse_mode='Markdown')
+    return PRICES
+
+async def get_product_prices(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    prices_text = update.message.text
+    prices = [p.strip() for p in prices_text.split(',')]
+    product_name = adding_product[user_id]["name"]
+    PRODUCTS[product_name] = prices
+    save_products()
+    del adding_product[user_id]
+    await update.message.reply_text(f"✅ Produit *{product_name}* ajouté avec prix : {', '.join(prices)}", parse_mode='Markdown')
+    return ConversationHandler.END
+
+async def list_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not PRODUCTS:
+        await update.message.reply_text("Aucun produit disponible.")
+        return
+    message = "🛒 *Produits disponibles :*\n\n"
+    for product, prices in PRODUCTS.items():
+        message += f"- *{product}* : {', '.join(prices)}\n"
+    await update.message.reply_text(message, parse_mode='Markdown')
+
+async def remove_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id not in ADMIN_IDS:
+        await update.message.reply_text("🚫 Tu n'as pas l'autorisation pour utiliser cette commande.")
+        return
+    if not PRODUCTS:
+        await update.message.reply_text("Aucun produit à supprimer.")
+        return
+    keyboard = [[InlineKeyboardButton(product, callback_data=f"remove_{product}")] for product in PRODUCTS.keys()]
+    await update.message.reply_text(
+        "Sélectionne le produit à supprimer :",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def confirm_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    product_name = query.data.replace('remove_', '')
+    if product_name in PRODUCTS:
+        del PRODUCTS[product_name]
+        save_products()
         await query.message.reply_text(f"✅ Produit *{product_name}* supprimé.", parse_mode='Markdown')
-else:
-    await query.message.reply_text("❌ Produit non trouvé.")
+    else:
+        await query.message.reply_text("❌ Produit non trouvé.")
 
 async def maintenance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global maintenance_mode
