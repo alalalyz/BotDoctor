@@ -109,6 +109,10 @@ async def get_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
     address = update.message.text.strip()
     if user_id not in user_data:
         return
+        
+        async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"📩 /start reçu de {update.effective_user.id}")
+    await update.message.reply_text("👋 Hello, ton bot est bien en ligne !")
 
     produit = user_data[user_id]["produit"]
     phone = user_data[user_id].get("phone", "Non fourni")
@@ -223,7 +227,11 @@ def run_bot():
     app.add_handler(CallbackQueryHandler(button))
     app.add_handler(MessageHandler(filters.CONTACT, get_contact))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, get_address))
+    
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("✉️ Message reçu !")
 
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
     print("✅ Bot en ligne.")
     app.run_polling()
 
