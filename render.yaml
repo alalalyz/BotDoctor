@@ -7,7 +7,7 @@ services:
     startCommand: bash start.sh
     envVars:
       - key: TOKEN
-        value: 7653011930:AAHbOO8DcnoRRaG-wXmgQG8YqnwUe4zTCUw
+        value: 7653011930:AAGFdMEdSmnw2IkRsjvEF_KnYYZoYJjtirU
       - key: ADMIN_IDS
         value: 542839510,5960037916
     autoDeploy: true
