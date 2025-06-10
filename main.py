@@ -226,10 +226,9 @@ def run_bot():
     app.add_handler(CallbackQueryHandler(button))
     app.add_handler(MessageHandler(filters.CONTACT, get_contact))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, get_address))
-
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
-print("✅ Bot en ligne.")
-app.run_polling()
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    print("✅ Bot en ligne.")
+    app.run_polling()
 
 # Serveur Flask pour Render
 app_flask = Flask(__name__)
