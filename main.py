@@ -1,5 +1,3 @@
-# Préparation du fichier main.py complet pour un bot Telegram utilisant Flask et webhook sur Render
-main_py_code = '''
 import os
 import json
 import csv
@@ -243,5 +241,3 @@ if __name__ == "__main__":
     threading.Thread(target=run_webhook).start()
     app_flask.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 '''
-
-main_py_code
