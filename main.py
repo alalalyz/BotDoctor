@@ -2,31 +2,25 @@ import os
 import json
 import csv
 import time
-from flask import Flask, request
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
     KeyboardButton, ReplyKeyboardMarkup
 )
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
-    ContextTypes, ConversationHandler, filters, ApplicationBuilder
+    ContextTypes, ConversationHandler, filters
 )
 
 TOKEN = os.getenv("TOKEN")
 ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "123456").split(",")))
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-PORT = int(os.environ.get("PORT", 5000))
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # ex: https://ton-bot.onrender.com
 
 PRODUCTS_FILE = 'products.json'
 ORDERS_FILE = 'orders.csv'
-
-PRODUCTS = {}
 user_data = {}
 cart = {}
 adding_product = {}
 maintenance_mode = False
-
-app_flask = Flask(__name__)
 
 def load_products():
     if os.path.exists(PRODUCTS_FILE):
@@ -46,7 +40,10 @@ def save_order(user_id, produit, address, phone, status):
         writer = csv.writer(file)
         writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S"), user_id, produit, address, phone, status])
 
-NOTICE = """🚚 *INFO LIVRAISON*
+PRODUCTS = load_products()
+
+NOTICE = """
+🚚 *INFO LIVRAISON*
 
 - Livraison dans tous les arrondissements de Marseille.
 - ⚠️ En dehors de *13001 à 13016*, un minimum de commande de *150€* est requis.
@@ -62,23 +59,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await update.message.reply_text(NOTICE, parse_mode='Markdown', disable_web_page_preview=True)
-
     keyboard = [[InlineKeyboardButton(name, callback_data=f"select_{name}")] for name in PRODUCTS]
     if update.message.from_user.id in ADMIN_IDS:
         keyboard.append([InlineKeyboardButton("⚙️ Menu Admin", callback_data="admin_menu")])
-
     await update.message.reply_text("👋 Bienvenue ! Que veux-tu commander :", reply_markup=InlineKeyboardMarkup(keyboard))
     
-async def show_cart(user_id, context):
-    items = cart.get(user_id, [])
-    if not items:
-        return
-    keyboard = [
-        [InlineKeyboardButton("✅ Valider la commande", callback_data="valider_commande")],
-        [InlineKeyboardButton("🗑 Vider le panier", callback_data="vider_panier")]
-    ]
-    await context.bot.send_message(chat_id=user_id, text="🛒 Ton panier :\n" + '\n'.join(items), reply_markup=InlineKeyboardMarkup(keyboard))
-
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -111,23 +96,40 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_cart(user_id, context)
 
     elif data == "admin_menu" and user_id in ADMIN_IDS:
-        await query.message.reply_text("🛠 Menu Admin :", reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ Ajouter un produit", callback_data="addproduct")],
-            [InlineKeyboardButton("📃 Voir produits", callback_data="listproducts")],
-            [InlineKeyboardButton("🚧 Toggle maintenance", callback_data="maintenance_toggle")]
-        ]))
+        await query.message.reply_text(
+            "🛠 Menu Admin :",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("➕ Ajouter un produit", callback_data="addproduct")],
+                [InlineKeyboardButton("📃 Voir produits", callback_data="listproducts")],
+                [InlineKeyboardButton("🚧 Toggle maintenance", callback_data="maintenance_toggle")]
+            ])
+        )
 
     elif data == "listproducts" and user_id in ADMIN_IDS:
-        msg = "📦 *Produits disponibles :*\n"
+        msg = "📦 *Produits disponibles :*\n\n"
         for name, prices in PRODUCTS.items():
             msg += f"• *{name}* : {', '.join(prices)}\n"
-        await query.message.reply_text(msg, parse_mode='Markdown')
+        await query.message.reply_text(msg, parse_mode="Markdown")
 
     elif data == "maintenance_toggle" and user_id in ADMIN_IDS:
         global maintenance_mode
         maintenance_mode = not maintenance_mode
-        await query.message.reply_text(f"⚠️ Maintenance {'activée' if maintenance_mode else 'désactivée'}.")
+        status = "activé" if maintenance_mode else "désactivé"
+        await query.message.reply_text(f"⚠️ Maintenance {status}.")
 
+async def show_cart(user_id, context):
+    items = cart.get(user_id, [])
+    if not items:
+        keyboard = [[InlineKeyboardButton("⬅️ Retour", callback_data="start")]]
+        await context.bot.send_message(chat_id=user_id, text="🛒 Ton panier est vide.", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    text = "🛍 *Ton panier :*\n\n" + "\n".join(f"• {item}" for item in items)
+    keyboard = [
+        [InlineKeyboardButton("✅ Valider commande", callback_data="valider_commande")],
+        [InlineKeyboardButton("🗑 Vider le panier", callback_data="vider_panier")]
+    ]
+    await context.bot.send_message(chat_id=user_id, text=text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+    
 async def get_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     phone = update.message.contact.phone_number
@@ -146,17 +148,17 @@ async def get_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data[user_id]["address"] = address
 
     arr = ''.join(filter(str.isdigit, address))
-    is_marseille = any(arr.startswith(f"130{i:02}") for i in range(1, 17))
-    total = sum(int(''.join(filter(str.isdigit, p))) for p in produit.split() if "€" in p)
+    arr_ok = any(arr.startswith(f"130{i:02}") for i in range(1, 17))
+    prix_total = sum(int(''.join(filter(str.isdigit, p))) for p in produit.split() if "€" in p)
 
-    if not is_marseille and total < 150:
-        await update.message.reply_text("❌ Minimum 150€ requis hors 13001–13016.")
+    if not arr_ok and prix_total < 150:
+        await update.message.reply_text("❌ Minimum de 150€ requis hors arrondissements 13001 à 13016.")
         save_order(user_id, produit, address, phone, "Refusée")
         cart[user_id] = []
         return
 
     save_order(user_id, produit, address, phone, "En attente")
-    link = f"[Contacter le client](tg://user?id={user_id})"
+    lien = f"[Contacter le client](tg://user?id={user_id})"
     for admin_id in ADMIN_IDS:
         await context.bot.send_message(
             chat_id=admin_id,
@@ -166,7 +168,7 @@ async def get_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🛒 Produit : {produit}\n"
                 f"📞 Numéro : {phone}\n"
                 f"📍 Adresse : {address}\n"
-                f"{link}"
+                f"{lien}"
             ),
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([
@@ -174,7 +176,7 @@ async def get_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("❌ Refuser", callback_data=f"refuser_{user_id}")]
             ])
         )
-    await update.message.reply_text("🕐 Commande envoyée. Attente validation.")
+    await update.message.reply_text("🕐 Commande envoyée aux admins, en attente de validation.")
 
 async def validate_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -183,79 +185,56 @@ async def validate_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = int(data.split("_")[1])
 
     if user_id not in user_data:
-        await query.message.reply_text("❌ Utilisateur introuvable.")
+        await query.message.reply_text("❌ Données introuvables.")
         return
 
     if "valider_" in data:
         status = "Validée"
-        msg = "✅ Ta commande a été validée. Un livreur est en route."
+        msg = "✅ Ta commande a été validée. Prépare-toi à recevoir ton colis !"
     else:
         status = "Refusée"
-        msg = "❌ Ta commande a été refusée."
+        msg = "❌ Désolé, ta commande a été refusée."
 
-    await context.bot.send_message(chat_id=user_id, text=msg)
     save_order(user_id, user_data[user_id]["produit"], user_data[user_id]["address"], user_data[user_id].get("phone", "Non fourni"), status)
-
+    await context.bot.send_message(chat_id=user_id, text=msg)
     await query.message.reply_text(f"Commande {status.lower()} pour l'utilisateur `{user_id}`.", parse_mode="Markdown")
-    if user_id in user_data:
-        del user_data[user_id]
-    if user_id in cart:
-        cart[user_id] = []
-
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("❌ Action annulée.")
-    return ConversationHandler.END
-
-async def add_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id not in ADMIN_IDS:
-        await update.message.reply_text("🚫 Tu n'es pas admin.")
-        return ConversationHandler.END
-    await update.message.reply_text("Nom du produit ?")
-    return NAME
-
-async def get_product_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    adding_product[user_id] = {"name": update.message.text}
-    await update.message.reply_text("Prix ? (séparés par virgule)")
-    return PRICES
-
-async def get_product_prices(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    prices = [p.strip() for p in update.message.text.split(',')]
-    name = adding_product[user_id]["name"]
-    PRODUCTS[name] = prices
-    save_products()
-    del adding_product[user_id]
-    await update.message.reply_text(f"✅ Produit *{name}* ajouté.", parse_mode="Markdown")
-    return ConversationHandler.END
+    del user_data[user_id]
+    cart[user_id] = []
 
 def run_webhook():
-    global PRODUCTS
-    PRODUCTS = load_products()
-
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("addproduct", add_product)],
-        states={
-            NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_product_name)],
-            PRICES: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_product_prices)]
-        },
-        fallbacks=[CommandHandler("cancel", cancel)]
-    )
+    app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(conv_handler)
-    app.add_handler(CallbackQueryHandler(validate_order, pattern="^(valider_|refuser_)"))
     app.add_handler(CallbackQueryHandler(button))
+    app.add_handler(CallbackQueryHandler(validate_order, pattern="^(valider_|refuser_)"))
     app.add_handler(MessageHandler(filters.CONTACT, get_contact))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, get_address))
 
+    webhook_url = f"{APP_URL}/webhook/{TOKEN}"
     app.run_webhook(
         listen="0.0.0.0",
-        port=PORT,
-        webhook_url=WEBHOOK_URL
+        port=int(os.environ.get("PORT", 5000)),
+        webhook_url=webhook_url
     )
 
+@app_flask.route(f"/webhook/{TOKEN}", methods=["POST"])
+def telegram_webhook():
+    from telegram import Update
+    update = Update.de_json(request.get_json(force=True), bot)
+    app.update_queue.put(update)
+    return "ok"
+
+@app_flask.route('/')
+def index():
+    return "✅ Bot actif via webhook."
+
 if __name__ == "__main__":
-    run_webhook()
+    import threading
+    from telegram import Bot
+    from telegram.ext import Application
+
+    bot = Bot(token=TOKEN)
+    app = Application.builder().token(TOKEN).build()
+
+    threading.Thread(target=run_webhook).start()
+    app_flask.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
