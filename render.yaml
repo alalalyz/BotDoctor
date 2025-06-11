@@ -11,5 +11,7 @@ services:
         value: 7644782997:AAGRD4wXYs6_YHKlvUlne14ow37byBaqb5s
       - key: ADMIN_IDS
         value: 542839510,5960037916
+      - key: WEBHOOK_URL
+        value: https://botdoctor.onrender.com/webhook
     autoDeploy: false
     branch: main
