@@ -237,12 +237,6 @@ def telegram_webhook():
     update = Update.de_json(request.get_json(force=True), bot)
     app.update_queue.put(update)
     return "ok"
-    
-@app_flask.route(f"/webhook/{TOKEN}", methods=["POST"])
-def telegram_webhook():
-    update = Update.de_json(request.get_json(force=True), bot)
-    app.update_queue.put(update)
-    return "ok"
 
 @app_flask.route('/')
 def index():
