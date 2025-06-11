@@ -1,9 +1,13 @@
+# Préparation du fichier main.py complet pour un bot Telegram utilisant Flask et webhook sur Render
+main_py_code = '''
 import os
 import json
 import csv
 import time
+import threading
+from flask import Flask, request
 from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup,
+    Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup,
     KeyboardButton, ReplyKeyboardMarkup
 )
 from telegram.ext import (
@@ -11,10 +15,12 @@ from telegram.ext import (
     ContextTypes, ConversationHandler, filters
 )
 
+# 🔧 Config
 TOKEN = os.getenv("TOKEN")
 ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "123456").split(",")))
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # ex: https://ton-bot.onrender.com
+APP_URL = os.getenv("WEBHOOK_URL")  # ex: https://ton-bot.onrender.com
 
+# 📁 Fichiers
 PRODUCTS_FILE = 'products.json'
 ORDERS_FILE = 'orders.csv'
 user_data = {}
@@ -22,6 +28,10 @@ cart = {}
 adding_product = {}
 maintenance_mode = False
 
+# 🌐 Flask
+app_flask = Flask(__name__)
+
+# 📦 Produits
 def load_products():
     if os.path.exists(PRODUCTS_FILE):
         with open(PRODUCTS_FILE, 'r') as file:
@@ -53,6 +63,7 @@ NOTICE = """
 
 NAME, PRICES = range(2)
 
+# 🚀 Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if maintenance_mode:
         await update.message.reply_text("🚧 Le bot est en maintenance.")
@@ -63,7 +74,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.id in ADMIN_IDS:
         keyboard.append([InlineKeyboardButton("⚙️ Menu Admin", callback_data="admin_menu")])
     await update.message.reply_text("👋 Bienvenue ! Que veux-tu commander :", reply_markup=InlineKeyboardMarkup(keyboard))
-    
+
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -99,7 +110,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(
             "🛠 Menu Admin :",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("➕ Ajouter un produit", callback_data="addproduct")],
                 [InlineKeyboardButton("📃 Voir produits", callback_data="listproducts")],
                 [InlineKeyboardButton("🚧 Toggle maintenance", callback_data="maintenance_toggle")]
             ])
@@ -129,7 +139,7 @@ async def show_cart(user_id, context):
         [InlineKeyboardButton("🗑 Vider le panier", callback_data="vider_panier")]
     ]
     await context.bot.send_message(chat_id=user_id, text=text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-    
+
 async def get_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     phone = update.message.contact.phone_number
@@ -219,7 +229,6 @@ def run_webhook():
 
 @app_flask.route(f"/webhook/{TOKEN}", methods=["POST"])
 def telegram_webhook():
-    from telegram import Update
     update = Update.de_json(request.get_json(force=True), bot)
     app.update_queue.put(update)
     return "ok"
@@ -229,12 +238,10 @@ def index():
     return "✅ Bot actif via webhook."
 
 if __name__ == "__main__":
-    import threading
-    from telegram import Bot
-    from telegram.ext import Application
-
     bot = Bot(token=TOKEN)
     app = Application.builder().token(TOKEN).build()
-
     threading.Thread(target=run_webhook).start()
     app_flask.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+'''
+
+main_py_code
