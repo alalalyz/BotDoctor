@@ -240,4 +240,3 @@ if __name__ == "__main__":
     app = Application.builder().token(TOKEN).build()
     threading.Thread(target=run_webhook).start()
     app_flask.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-'''
