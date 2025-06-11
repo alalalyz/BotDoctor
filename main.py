@@ -224,7 +224,20 @@ def run_webhook():
         port=int(os.environ.get("PORT", 5000)),
         webhook_url=webhook_url
     )
+    
+from telegram import Bot
+from telegram.ext import Application
 
+bot = Bot(token=TOKEN)
+app = Application.builder().token(TOKEN).build()
+
+@app_flask.route(f"/webhook/{TOKEN}", methods=["POST"])
+def telegram_webhook():
+    from telegram import Update
+    update = Update.de_json(request.get_json(force=True), bot)
+    app.update_queue.put(update)
+    return "ok"
+    
 @app_flask.route(f"/webhook/{TOKEN}", methods=["POST"])
 def telegram_webhook():
     update = Update.de_json(request.get_json(force=True), bot)
@@ -236,7 +249,5 @@ def index():
     return "✅ Bot actif via webhook."
 
 if __name__ == "__main__":
-    bot = Bot(token=TOKEN)
-    app = Application.builder().token(TOKEN).build()
     threading.Thread(target=run_webhook).start()
     app_flask.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
